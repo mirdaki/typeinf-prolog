@@ -4,9 +4,11 @@
 /* Note: when writing tests keep in mind that 
     the use of of global variable and function definitions
     define facts for gvar() predicate. Either test
-    directy infer() predicate or call
-    delegeGVars() predicate to clean up gvar().
+    directly infer() predicate or call
+    deleteGVars() predicate to clean up gvar().
 */
+
+% More notes: Make sure you have tests that check for failure
 
 % tests for typeExp
 test(typeExp_iplus) :- 

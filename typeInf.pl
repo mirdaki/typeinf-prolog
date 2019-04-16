@@ -1,5 +1,5 @@
 /* match functions by unifying with arguments 
-    and infering the result
+    and inferring the result
 */
 typeExp(Fct, T):-
     \+ var(Fct), /* make sure Fct is not a variable */ 
@@ -7,18 +7,18 @@ typeExp(Fct, T):-
     functor(Fct, Fname, _Nargs), /* ensure we have a functor */
     !, /* if we make it here we do not try anything else */
     Fct =.. [Fname|Args], /* get list of arguments */
-    append(Args, [T], FType), /* make it loook like a function signature */
+    append(Args, [T], FType), /* make it look like a function signature */
     functionType(Fname, TArgs), /* get type of arguments from definition */
-    typeExpList(FType, TArgs). /* recurisvely match types */
+    typeExpList(FType, TArgs). /* recursively match types */
 
 /* propagate types */
 typeExp(T, T).
 
-/* list version to allow function mathine */
+/* list version to allow function machine */
 typeExpList([], []).
 typeExpList([Hin|Tin], [Hout|Tout]):-
     typeExp(Hin, Hout), /* type infer the head */
-    typeExpList(Tin, Tout). /* recurse */
+    typeExpList(Tin, Tout). /* recursive */
 
 /* TODO: add statements types and their type checking */
 /* global variable definition
@@ -28,7 +28,7 @@ typeExpList([Hin|Tin], [Hout|Tout]):-
 typeStatement(gvLet(Name, T, Code), unit):-
     atom(Name), /* make sure we have a bound name */
     typeExp(Code, T), /* infer the type of Code and ensure it is T */
-    bType(T), /* make sure we have an infered type */
+    bType(T), /* make sure we have an inferred type */
     asserta(gvar(Name, T)). /* add definition to database */
 
 /* Code is simply a list of statements. The type is 
@@ -39,7 +39,7 @@ typeCode([S, S2|Code], T):-
     typeStatement(S,_T),
     typeCode([S2|Code], T).
 
-/* top level function */
+/* top level function, this is clean up code */
 infer(Code, T) :-
     is_list(Code), /* make sure Code is a list */
     deleteGVars(), /* delete all global definitions */
@@ -72,8 +72,8 @@ bType([H|T]):- bType(H), bType(T).
     Examples:
         g
 
-    Call the predicate deleveGVars() to delete all global 
-    variables. Best wy to do this is in your top predicate
+    Call the predicate deleteGVars() to delete all global 
+    variables. Best way to do this is in your top predicate
 */
 
 deleteGVars():-retractall(gvar), asserta(gvar(_X,_Y):-false()).
@@ -90,10 +90,11 @@ fType(fplus, [float, float, float]).
 fType(fToInt, [float,int]).
 fType(iToFloat, [int,float]).
 fType(print, [_X, unit]). /* simple print */
+fType(identity, [T, T]). /* Get the type of the input and output it */
 
 /* Find function signature
-   A function is either buld in using fType or
-   added as a user definition with gvar(fct, List)
+    A function is either build in using fType or
+    added as a user definition with gvar(fct, List)
 */
 
 % Check the user defined functions first
@@ -106,4 +107,5 @@ functionType(Name, Args) :-
     fType(Name, Args), !. % make deterministic
 
 % This gets wiped out but we have it here to make the linter happy
-gvar(_, _) :- false().
+% gvar(_, _) :- false().
+:- dynamic(gvar/2).
