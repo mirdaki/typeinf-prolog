@@ -152,7 +152,86 @@ test(typeExpList_fake_missing_out, [fail]) :-
 test(typeExpList_fake_var, [fail]) :-
 	typeExpList([x], [int]).
 
-/* TODO: Test for statements */
+/* Test for statements */
+
+% Test calling an exprestion 
+test(typeStatement_expr_plain, [nondet]) :-
+	typeStatement(int, T),
+	assertion(T == int).
+
+test(typeStatement_expr_iplus, [nondet]) :-
+	typeStatement(iplus(X, Y), Z),
+	assertion(X == int), assertion(Y == int), assertion(Z == int).
+
+test(typeStatement_expr_print, [nondet]) :-
+	typeStatement(print(_X), Y),
+	assertion(Y == unit).
+
+% Test gvLet
+test(typeStatement_gvLet_lessThanF, [nondet]) :-
+	typeStatement(gvLet(v, T, lessThanF(X, Y)), unit),
+	assertion(T == bool), assertion(X == float), assertion(Y == float),
+	gvar(v, float).
+
+test(typeStatement_gvLet_iplus, [nondet]) :-
+	typeStatement(gvLet(v, T, iplus(X, Y)), unit),
+	assertion(T == int), assertion(X == int), assertion(Y == int),
+	gvar(v, int).
+
+% Test gvFun
+test(typeStatement_gvFun_typed, [nondet]) :-
+	typeStatement(gvFun(add, [int, int], int, [iplus(int, int)]), int),
+	gvar(add, [int, int, int]).
+
+test(typeStatement_gvFun_check, [nondet]) :-
+	typeStatement(gvFun(subtract, [A, B], C, [iplus(int, int)]), int),
+	assertion(C == int),
+	gvar(add, [A, B, C]).
+
+% Test if
+test(typeStatement_if_types, [nondet]) :-
+	typeStatement(if(B, [], []), T),
+	assertion(B == bool), assertion(T == unit).
+
+test(typeStatement_if_one, [nondet]) :-
+	typeStatement(if(B, iplus(X, Y), []), T),
+	assertion(B == bool), assertion(X == int), assertion(Y == int), assertion(T == int).
+
+test(typeStatement_if_two, [nondet]) :-
+	typeStatement(if(B, iplus(X, X), fToInt(Y)), T),
+	assertion(B == bool), assertion(X == int), assertion(Y == float), assertion(T == int).
+
+test(typeStatement_if_two_f, [fail]) :-
+	typeStatement(if(B, iplus(X, X), fplus(Y, Y)), T),
+	assertion(B == bool), assertion(X == int), assertion(Y == float), assertion(T == int).
+
+% Test for
+
+test(typeStatement_for_types, [nondet]) :-
+	typeStatement(for(_, B, _, []), T),
+	assertion(B == bool), assertion(T == unit).
+
+test(typeStatement_for_head, [nondet]) :-
+	typeStatement(for(int, greaterThanEqualI(Y, Y), int, []), T),
+	assertion(Y == int), assertion(T == unit).
+
+test(typeStatement_for_full, [nondet]) :-
+	typeStatement(for(fplus(X, X), greaterThanEqualI(Y, Y), fplus(Z, Z), gvLet(x, int, int)), T),
+	assertion(X == float), assertion(Y == int), assertion(Z == float), assertion(T == unit).
+
+% Test while
+
+test(typeStatement_while_types, [nondet]) :-
+	typeStatement(while(B, []), T),
+	assertion(B == bool), assertion(T == unit).
+
+test(typeStatement_while_head, [nondet]) :-
+	typeStatement(while(greaterThanEqualI(Y, Y), []), T),
+	assertion(Y == int), assertion(T == unit).
+
+test(typeStatement_while_full, [nondet]) :-
+	typeStatement(while(greaterThanEqualI(Y, Y), gvLet(x, int, int)), T),
+	assertion(Y == int), assertion(T == unit).
 
 /* Test for code blocks */
 
@@ -162,18 +241,14 @@ test(typeCode_gvLet, [nondet]) :-
 test(typeCode_gvLet_mulit, [nondet]) :-
 	typeCode([gvLet(v, Y, identity(Y)), gvLet(v, _, fplus(float, float))], unit).
 
-test(typeCode_empty, [fail]) :-
+test(typeCode_empty, [nondet]) :-
 	typeCode([], unit).
 
 test(typeCode_gvLet_bad, [fail]) :-
 	typeCode([gvLet(v, int, identity(iny)), gvLet(v, float, fplus(float, float))], int).
 
-/* TODO: Test for user defined variables? */
 
-/* TODO: Test for user defined functions */
-
-/* Integration testing */
-
+/* TODO: Integration testing */
 
 % test for statement with state cleaning
 test(typeStatement_gvar, [nondet, true(T == int)]) :- % should succeed with T=int
@@ -196,3 +271,9 @@ test(mockedFct, [nondet]) :-
 	assertion(X == int), assertion(T == float). % make sure the types infered are correct
 
 :-end_tests(typeInf).
+
+/*
+	Things I like
+	- typeCode(expr(iplus(int, int)), T).
+	- typeStatement(if(lessThanF(float, float), [expr(int)], [expr(int)]), int).
+*/

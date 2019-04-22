@@ -20,19 +20,7 @@ typeExpList([Hin|Tin], [Hout|Tout]):-
 	typeExp(Hin, Hout), /* type infer the head */
 	typeExpList(Tin, Tout). /* recursive */
 
-/* TODO: add statements types and their type checking (such as if, loops, etc) */
-
 /* Statements */
-
-/* 
-	Expression
-	Example: 
-		expr(int) ~ 1 + 1;
-		expr(unit) ~ print "hello world";
-*/
-typeStatement(expr(Code), T) :-
-	typeExp(Code, T),
-	bType(T).
 
 /*
 	Return
@@ -56,37 +44,30 @@ typeStatement(gvLet(Name, T, Code), unit):-
 	bType(T), /* make sure we have an inferred type */
 	asserta(gvar(Name, T)). /* add definition to database */
 
-/* TODO: Function defintions 
+/* TODO: Function defintions do gFun? 
 	Example:
 		let add x y = x+y
 */
-typeStatement(gvFun(Name, Args, Code), T):-
+typeStatement(gvFun(Name, Args, T, Code), T):-
 	atom(Name), /* make sure we have a bound name */
 	typeCode(Code, T), /* infer the type of Code and ensure it is T */
 	bType(T), /* make sure we have an inferred type */
 	is_list(Args),
-	asserta(gvar(Name, T)). /* add definition to database */
+	append(Args, [T], FArgs),
+	asserta(gvar(Name, FArgs)). /* add definition to database */
 
 /*
 	If
 	Examples: 
-		if(bool, gvLet(x, T, T)) ~ if x == y then gvLet x = 1;
+		if(bool, gvLet(x, T, T), []) ~ if x == y then gvLet x = 1;
 		if(bool, gvLet(x, T, T), gvLet(x, T, T)) ~ if x == y then gvLet x = 1; else gvLet x = 2;
 */
-typeStatement(if(Cond, TCode), T) :-
-	typeStatement(if(Cond, TCode), T) :-
-	typeExp(Cond, B),
-	bType(B),
-	B = bool,
-	bType(T), 
-	typeCode(TCode, T).
+
 typeStatement(if(Cond, TCode, FCode), T) :-
-	typeExp(Cond, B),
-	bType(B),
-	B = bool,
-	bType(T), 
+	typeExp(Cond, bool),
 	typeCode(TCode, T),
-	typeCode(FCode, T).
+	typeCode(FCode, T),
+	bType(T).
 
 /* TODO: For `let ... in ...` you can use this map to recreate scopes (http://www.swi-prolog.org/pldoc/man?section=pairs) */
 
@@ -120,11 +101,23 @@ typeStatement(while(Cond, Code), unit) :-
 	bType(T), 
 	T = unit.
 
-/* TODO: Code block? */
-
-/* Code is simply a list of statements. The type is 
-	the type of the last statement 
+/* 
+	Expression (both calling a function and being itself)
+	Example: 
+		expr(float) ~ 1.3;
+		expr(int) ~ 1 + 1;
+		expr(unit) ~ print "hello world";
 */
+typeStatement(Code, T) :-
+	typeExp(Code, T),
+	bType(T).
+
+/* 
+	Code is simply a list of statements. The type is 
+	the type of the last statement. If empty list, just assume it's right.
+	If code is not an array, assume it is one element
+*/
+typeCode([], _T).
 typeCode(S, T):- typeStatement(S, T).
 typeCode([S], T):- typeStatement(S, T).
 typeCode([S, S2|Code], T):-
@@ -138,12 +131,12 @@ infer(Code, T) :-
 	typeCode(Code, T).
 
 /* Basic types */
+bType(unit). /* unit type for things that are not expressions */
 bType(int).
 bType(float).
 bType(bool).
 bType(char).
 bType(string).
-bType(unit). /* unit type for things that are not expressions */
 
 /*  functions type.
 	The type is a list, the last element is the return type
