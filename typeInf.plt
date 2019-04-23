@@ -101,7 +101,7 @@ test(typeExp_iplus) :-
 test(typeExp_iplus_F, [fail]) :-
 	typeExp(iplus(int, int), float).
 
-test(typeExp_iplus_T, [true(T == int)]) :-
+test(typeExp_iplus_T, [nondet, true(T == int)]) :-
 	typeExp(iplus(int, int), T).
 
 % Using print
@@ -144,12 +144,15 @@ test(typeExpList_empty) :-
 
 % Fake functions
 test(typeExpList_fake, [fail]) :-
+	deleteDb(),
 	typeExpList([fake(int, int)], [int]).
 
 test(typeExpList_fake_missing_out, [fail]) :-
+	deleteDb(),
 	typeExpList([fake(int, int)], []).
 
 test(typeExpList_fake_var, [fail]) :-
+	deleteDb(),
 	typeExpList([x], [int]).
 
 /* Test for statements */
@@ -169,24 +172,59 @@ test(typeStatement_expr_print, [nondet]) :-
 
 % Test gvLet
 test(typeStatement_gvLet_lessThanF, [nondet]) :-
+	deleteDb(),
 	typeStatement(gvLet(v, T, lessThanF(X, Y)), unit),
 	assertion(T == bool), assertion(X == float), assertion(Y == float),
-	gvar(v, float).
+	gvar(v, bool).
 
 test(typeStatement_gvLet_iplus, [nondet]) :-
+	deleteDb(),
 	typeStatement(gvLet(v, T, iplus(X, Y)), unit),
 	assertion(T == int), assertion(X == int), assertion(Y == int),
 	gvar(v, int).
 
 % Test gvFun
 test(typeStatement_gvFun_typed, [nondet]) :-
+	deleteDb(),
 	typeStatement(gvFun(add, [int, int], int, [iplus(int, int)]), int),
 	gvar(add, [int, int, int]).
 
 test(typeStatement_gvFun_check, [nondet]) :-
+	deleteDb(),
 	typeStatement(gvFun(subtract, [A, B], C, [iplus(int, int)]), int),
 	assertion(C == int),
-	gvar(add, [A, B, C]).
+	gvar(subtract, [A, B, C]).
+
+test(typeStatement_gvFun_noop, [nondet]) :-
+	deleteDb(),
+	typeStatement(gvFun(noop, [], C, []), unit),
+	assertion(C == unit),
+	gvar(noop, [C]).
+
+% Test lvLet
+test(typeStatement_lvLet_lessThanF, [nondet]) :-
+	deleteDb(),
+	typeStatement(lvLet(g, T, lessThanF(X, Y), []), unit),
+	assertion(T == bool), assertion(X == float), assertion(Y == float).
+
+test(typeStatement_lvLet_iplus, [nondet]) :-
+	deleteDb(),
+	typeStatement(lvLet(k, T, iplus(X, Y), [k]), unit),
+	assertion(T == int), assertion(X == int), assertion(Y == int).
+
+test(typeStatement_lvLet_removed, [fail]) :-
+	deleteDb(),
+	typeStatement(lvLet(a, T, iplus(X, Y), [k]), unit),
+	assertion(T == int), assertion(X == int), assertion(Y == int),
+	lvar(a, T).
+
+test(typeStatement_lvLet_global, [fail]) :-
+	deleteDb(),
+	typeStatement(lvLet(q, T, iplus(X, Y), print(q)), unit),
+	assertion(T == int), assertion(X == int), assertion(Y == int),
+	gvar(q, T).
+
+% Independently do a test to see if locals exist after running test
 
 % Test if
 test(typeStatement_if_types, [nondet]) :-
@@ -216,6 +254,7 @@ test(typeStatement_for_head, [nondet]) :-
 	assertion(Y == int), assertion(T == unit).
 
 test(typeStatement_for_full, [nondet]) :-
+	deleteDb(),
 	typeStatement(for(fplus(X, X), greaterThanEqualI(Y, Y), fplus(Z, Z), gvLet(x, int, int)), T),
 	assertion(X == float), assertion(Y == int), assertion(Z == float), assertion(T == unit).
 
@@ -236,15 +275,18 @@ test(typeStatement_while_full, [nondet]) :-
 /* Test for code blocks */
 
 test(typeCode_gvLet, [nondet]) :-
+	deleteDb(),
 	typeCode([gvLet(v, int, identity(int))], unit).
 
 test(typeCode_gvLet_mulit, [nondet]) :-
+	deleteDb(),
 	typeCode([gvLet(v, Y, identity(Y)), gvLet(v, _, fplus(float, float))], unit).
 
 test(typeCode_empty, [nondet]) :-
 	typeCode([], unit).
 
 test(typeCode_gvLet_bad, [fail]) :-
+	deleteDb(),
 	typeCode([gvLet(v, int, identity(iny)), gvLet(v, float, fplus(float, float))], int).
 
 
@@ -252,7 +294,7 @@ test(typeCode_gvLet_bad, [fail]) :-
 
 % test for statement with state cleaning
 test(typeStatement_gvar, [nondet, true(T == int)]) :- % should succeed with T=int
-	deleteGVars(), /* clean up variables */
+	deleteDb(), /* clean up variables */
 	typeStatement(gvLet(v, T, iplus(X, Y)), unit),
 	assertion(X == int), assertion(Y == int), % make sure the types are int
 	gvar(v, int). % make sure the global variable is defined
@@ -265,7 +307,7 @@ test(infer_gvar, [nondet]) :-
 
 % test custom function with mocked definition
 test(mockedFct, [nondet]) :-
-	deleteGVars(), % clean up variables since we cannot use infer
+	deleteDb(), % clean up variables since we cannot use infer
 	asserta(gvar(my_fct, [int, float])), % add my_fct(int)-> float to the gloval variables
 	typeExp(my_fct(X), T), % infer type of expression using or function
 	assertion(X == int), assertion(T == float). % make sure the types infered are correct

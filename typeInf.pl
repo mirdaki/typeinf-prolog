@@ -11,8 +11,37 @@ typeExp(Fct, T):-
 	functionType(Fname, TArgs), /* get type of arguments from definition */
 	typeExpList(FType, TArgs). /* recursively match types */
 
+% Check if a variable exists (local than global)
+typeExp(Var, T):-
+	% atom(Var),
+	\+ is_list(T),
+	\+ bType(Var),
+	\+ var(Var),
+	% \+ functor(Var, _, _),
+	% \+ fType(Var, T),
+	% atom(Var),
+	% !,
+	% lvar(Var, T).
+	lvar(Var, T)
+	;
+	\+ is_list(T),
+	\+ bType(Var),
+	\+ var(Var),
+	gvar(Var, T).
+
+/* typeExp(Var, T):-
+	\+ is_list(T),
+	\+ bType(Var),
+	\+ var(Var),
+	gvar(Var, T). */
+
 /* propagate types */
-typeExp(T, T).
+typeExp(T, T):-
+/* 	\+ var(T),
+	!,
+	\+ fType(T, T),
+	!, */
+	bType(T).
 
 /* list version to allow function machine */
 typeExpList([], []).
@@ -44,9 +73,10 @@ typeStatement(gvLet(Name, T, Code), unit):-
 	bType(T), /* make sure we have an inferred type */
 	asserta(gvar(Name, T)). /* add definition to database */
 
-/* TODO: Function defintions do gFun? 
+/* Global function definitions
 	Example:
-		let add x y = x+y
+		gvFun(noop, [], int, []) ~ let noop = 0;
+		gvFun(add, [], int, [iplus(int, int)]) ~ let add x y = x+y
 */
 typeStatement(gvFun(Name, Args, T, Code), T):-
 	atom(Name), /* make sure we have a bound name */
@@ -56,20 +86,32 @@ typeStatement(gvFun(Name, Args, T, Code), T):-
 	append(Args, [T], FArgs),
 	asserta(gvar(Name, FArgs)). /* add definition to database */
 
+	/* TODO: For `let ... in ...` you can use this map to recreate scopes (http://www.swi-prolog.org/pldoc/man?section=pairs) */
+/* 
+	Local variable definition
+	Example:
+		lvLet(v, T, int) ~ let v = 3 in print v ;
+		lvLet(a, float, float) ~ let a: float = 2.5 in print a ;
+*/
+typeStatement(lvLet(Name, T, Code, In), unit):-
+	atom(Name), /* make sure we have a bound name */
+	typeExp(Code, T), /* infer the type of Code and ensure it is T */
+	bType(T), /* make sure we have an inferred type */
+	asserta(lvar(Name, T)), /* add definition to database */
+	typeCode(In, _),
+	deleteLVars().
+
 /*
 	If
 	Examples: 
 		if(bool, gvLet(x, T, T), []) ~ if x == y then gvLet x = 1;
 		if(bool, gvLet(x, T, T), gvLet(x, T, T)) ~ if x == y then gvLet x = 1; else gvLet x = 2;
 */
-
 typeStatement(if(Cond, TCode, FCode), T) :-
 	typeExp(Cond, bool),
 	typeCode(TCode, T),
 	typeCode(FCode, T),
 	bType(T).
-
-/* TODO: For `let ... in ...` you can use this map to recreate scopes (http://www.swi-prolog.org/pldoc/man?section=pairs) */
 
 /* 
 	For loop 
@@ -127,6 +169,7 @@ typeCode([S, S2|Code], T):-
 /* top level function, this is clean up code */
 infer(Code, T) :-
 	is_list(Code), /* make sure Code is a list */
+	deleteLVars(), /* delete all local definitions */
 	deleteGVars(), /* delete all global definitions */
 	typeCode(Code, T).
 
@@ -147,9 +190,9 @@ bType([H]):- bType(H).
 bType([H|T]):- bType(H), bType(T).
 
 /*
-	TODO: as you encounter global variable definitions
+	As you encounter global variable definitions
 	or global functions add their definitions to 
-	the database using:
+	the database using:var
 		asserta( gvar(Name, Type) )
 	To check the types as you encounter them in the code
 	use:
@@ -162,8 +205,11 @@ bType([H|T]):- bType(H), bType(T).
 	variables. Best way to do this is in your top predicate
 */
 
-deleteGVars():-retractall(gvar), asserta(gvar(_X, _Y):- false()).
-
+deleteGVars():-retractall(gvar(_,_)), asserta(gvar(_X, _Y):- false()).
+deleteLVars():-retractall(lvar(_,_)), asserta(lvar(_X, _Y):- false()).
+deleteDb():-
+	deleteGVars(),
+	deleteLVars().
 /*  builtin functions
 	Each definition specifies the name and the 
 	type as a function type
@@ -193,16 +239,17 @@ fType(identity, [T, T]). /* Get the type of the input and output it */
 	A function is either build in using fType or
 	added as a user definition with gvar(fct, List)
 */
-
 % Check the user defined functions first
 functionType(Name, Args):-
 	gvar(Name, Args),
 	is_list(Args). % make sure we have a function not a simple variable
 
-% Check first built in functions
+% Check built in functions
 functionType(Name, Args) :-
 	fType(Name, Args), !. % make deterministic
 
 % This gets wiped out but we have it here to make the linter happy
 % gvar(_, _) :- false().
 :- dynamic(gvar/2).
+:- dynamic(lvar/2).
+% :- discontiguous plunit_typeInf:deleteLVars().
