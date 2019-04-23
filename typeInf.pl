@@ -13,27 +13,18 @@ typeExp(Fct, T):-
 
 % Check if a variable exists (local than global)
 typeExp(Var, T):-
-	% atom(Var),
 	\+ is_list(T),
 	\+ bType(Var),
 	\+ var(Var),
-	% \+ functor(Var, _, _),
-	% \+ fType(Var, T),
-	% atom(Var),
-	% !,
-	% lvar(Var, T).
+	/* TODO: For checking each scope of lvar (in a seperate function) */
+	% Like a list, check the head for a match
+	% Go through list and take the head and check
 	lvar(Var, T)
 	;
 	\+ is_list(T),
 	\+ bType(Var),
 	\+ var(Var),
 	gvar(Var, T).
-
-/* typeExp(Var, T):-
-	\+ is_list(T),
-	\+ bType(Var),
-	\+ var(Var),
-	gvar(Var, T). */
 
 /* propagate types */
 typeExp(T, T):-
@@ -94,6 +85,16 @@ typeStatement(gvFun(Name, Args, T, Code), T):-
 		lvLet(a, float, float) ~ let a: float = 2.5 in print a ;
 */
 typeStatement(lvLet(Name, T, Code, In), unit):-
+	/* TODO: Steps for scopes */
+	% get the "stack" from lvar
+	% add Name of T to it
+	% Put back in lvar
+	% !,
+	% Compute code
+	% !,
+	% Get stack from lvar
+	% Pop the head
+	% Put smaller stack on lvar
 	atom(Name), /* make sure we have a bound name */
 	typeExp(Code, T), /* infer the type of Code and ensure it is T */
 	bType(T), /* make sure we have an inferred type */
@@ -252,4 +253,3 @@ functionType(Name, Args) :-
 % gvar(_, _) :- false().
 :- dynamic(gvar/2).
 :- dynamic(lvar/2).
-% :- discontiguous plunit_typeInf:deleteLVars().
