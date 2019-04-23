@@ -290,7 +290,26 @@ test(typeCode_gvLet_bad, [fail]) :-
 	typeCode([gvLet(v, int, identity(iny)), gvLet(v, float, fplus(float, float))], int).
 
 
-/* TODO: Integration testing */
+/* Integration testing */
+test(infer_multipleScopes, [nondet]) :- 
+	infer([lvLet(a, int, int, [lvLet(b, int, int, [lvLet(c, int, int, [a,b,c])])])], unit).
+
+test(infer_overridingScopes, [nondet]) :- 
+	infer([gvLet(a,bool,bool), lvLet(a, int, int, [lvLet(b, int, int, [lvLet(a, float, float, [a,b])])])], unit),
+	assertion(gvar(a,bool)), assertion(lvar([])).
+
+test(infer_if, [nondet]) :- 
+	infer([gvLet(a, float, float), if(lessThanF(float, float), [fplus(a, float)], [fminus(a, float)])], float).
+
+test(infer_functionLoop, [nondet]) :- 
+	infer([gvFun(add, [int, int], int, [return(iplus(int, int))]), gvLet(a, T, int), while(lessThanI(a, int), [add(a, int), unit])], unit),
+	assertion(T == int).
+
+test(infer_nestedFor, [nondet]) :- 
+	infer([for(gvLet(i, T, int), greaterThanEqualI(i, int), iminus(i, int), [for(gvLet(j, U, int), greaterThanEqualI(j, int), iminus(j, int), [for(gvLet(k, V, int), greaterThanEqualI(k, int), iminus(k, int), [print(i), print(j), print(k)])])])], unit),
+	assertion(T == int) , assertion(U == int), assertion(V == int).
+
+/* Example tests */
 
 % test for statement with state cleaning
 test(typeStatement_gvar, [nondet, true(T == int)]) :- % should succeed with T=int
@@ -313,9 +332,3 @@ test(mockedFct, [nondet]) :-
 	assertion(X == int), assertion(T == float). % make sure the types infered are correct
 
 :-end_tests(typeInf).
-
-/*
-	Things I like
-	- typeCode(expr(iplus(int, int)), T).
-	- typeStatement(if(lessThanF(float, float), [expr(int)], [expr(int)]), int).
-*/

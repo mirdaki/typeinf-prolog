@@ -16,10 +16,8 @@ typeExp(Var, T):-
 	\+ is_list(T),
 	\+ bType(Var),
 	\+ var(Var),
-	/* TODO: For checking each scope of lvar (in a seperate function) */
-	% Like a list, check the head for a match
-	% Go through list and take the head and check
-	lvar(Var, T)
+	lvar(Stack),
+	variableType(Var, T, Stack)
 	;
 	\+ is_list(T),
 	\+ bType(Var),
@@ -28,10 +26,6 @@ typeExp(Var, T):-
 
 /* propagate types */
 typeExp(T, T):-
-/* 	\+ var(T),
-	!,
-	\+ fType(T, T),
-	!, */
 	bType(T).
 
 /* list version to allow function machine */
@@ -77,7 +71,6 @@ typeStatement(gvFun(Name, Args, T, Code), T):-
 	append(Args, [T], FArgs),
 	asserta(gvar(Name, FArgs)). /* add definition to database */
 
-	/* TODO: For `let ... in ...` you can use this map to recreate scopes (http://www.swi-prolog.org/pldoc/man?section=pairs) */
 /* 
 	Local variable definition
 	Example:
@@ -85,22 +78,24 @@ typeStatement(gvFun(Name, Args, T, Code), T):-
 		lvLet(a, float, float) ~ let a: float = 2.5 in print a ;
 */
 typeStatement(lvLet(Name, T, Code, In), unit):-
-	/* TODO: Steps for scopes */
-	% get the "stack" from lvar
-	% add Name of T to it
-	% Put back in lvar
-	% !,
-	% Compute code
-	% !,
-	% Get stack from lvar
-	% Pop the head
-	% Put smaller stack on lvar
 	atom(Name), /* make sure we have a bound name */
 	typeExp(Code, T), /* infer the type of Code and ensure it is T */
 	bType(T), /* make sure we have an inferred type */
-	asserta(lvar(Name, T)), /* add definition to database */
+	% get the "stack" from lvar
+	lvar(Stack),
+	% add Name and T to it
+	group_pairs_by_key([Name-T], Scope),
+	% Put back in lvar
+	append(Scope, Stack, NewStack),
+	deleteLVars(),
+	asserta(lvar(NewStack)),
+	!,
+	% Compute code
 	typeCode(In, _),
-	deleteLVars().
+	!,
+	% Replace the stack with the original
+	deleteLVars(),
+	asserta(lvar(Stack)).
 
 /*
 	If
@@ -120,7 +115,7 @@ typeStatement(if(Cond, TCode, FCode), T) :-
 		for(int, bool, int, unit) ~ for (i = 0; i < 10; i++) { let v = v + 1 }
 */
 typeStatement(for(Init, Cond, Tail, Code), unit) :-
-	typeExp(Init, I),
+	typeStatement(Init, I),
 	bType(I),
 	typeExp(Cond, B),
 	bType(B),
@@ -170,8 +165,7 @@ typeCode([S, S2|Code], T):-
 /* top level function, this is clean up code */
 infer(Code, T) :-
 	is_list(Code), /* make sure Code is a list */
-	deleteLVars(), /* delete all local definitions */
-	deleteGVars(), /* delete all global definitions */
+	deleteDb(), /* delete all definitions */
 	typeCode(Code, T).
 
 /* Basic types */
@@ -205,19 +199,16 @@ bType([H|T]):- bType(H), bType(T).
 	Call the predicate deleteGVars() to delete all global 
 	variables. Best way to do this is in your top predicate
 */
-
 deleteGVars():-retractall(gvar(_,_)), asserta(gvar(_X, _Y):- false()).
-deleteLVars():-retractall(lvar(_,_)), asserta(lvar(_X, _Y):- false()).
+deleteLVars():-retractall(lvar(_)), asserta(lvar([])/* :- false() */).
 deleteDb():-
 	deleteGVars(),
 	deleteLVars().
+
 /*  builtin functions
 	Each definition specifies the name and the 
 	type as a function type
-
-	TODO: add more functions
 */
-
 fType(lessThanF, [float, float, bool]).
 fType(lessThanI, [int, int, bool]).
 fType(lessThanEqualF, [float, float, bool]).
@@ -231,10 +222,26 @@ fType(equalI, [int, int, bool]).
 
 fType(iplus, [int, int, int]).
 fType(fplus, [float, float, float]).
+fType(iminus, [int, int, int]).
+fType(fminus, [float, float, float]).
+fType(imultiply, [int, int, int]).
+fType(fmultiply, [float, float, float]).
+fType(idivide, [int, int, int]).
+fType(fdivide, [float, float, float]).
+
 fType(fToInt, [float, int]).
 fType(iToFloat, [int, float]).
 fType(print, [_X, unit]). /* simple print */
 fType(identity, [T, T]). /* Get the type of the input and output it */
+
+/* Find local variable
+	Recursively go through a "stack" to find if a variable exits
+*/
+variableType(Var, T, Head):-
+	memberchk(Var-[T], [Head]).
+variableType(Var, T, [Head|Tail]):-
+	variableType(Var, T, Head);
+	variableType(Var, T, Tail).
 
 /* Find function signature
 	A function is either build in using fType or
@@ -252,4 +259,4 @@ functionType(Name, Args) :-
 % This gets wiped out but we have it here to make the linter happy
 % gvar(_, _) :- false().
 :- dynamic(gvar/2).
-:- dynamic(lvar/2).
+:- dynamic(lvar/1).
